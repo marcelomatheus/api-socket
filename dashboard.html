@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Servidor Dashboard - Monitoramento</title>
+    <style>
+        body { background-color: #000; color: #0f0; font-family: 'Courier New', Courier, monospace; padding: 20px; }
+        h1 { border-bottom: 2px solid #0f0; padding-bottom: 10px; }
+        #log-container { border: 1px solid #333; padding: 10px; height: 400px; overflow-y: scroll; background: #050505; }
+        .log-entry { margin-bottom: 5px; border-bottom: 1px dashed #333; padding: 5px; }
+        .encrypted { color: #f00; }
+        .decrypted { color: #0ff; }
+        .meta { color: #888; font-size: 0.8em; }
+    </style>
+</head>
+<body>
+    <h1>[SERVER] Painel de Controle e Criptografia</h1>
+    <p>Status: <span id="status" style="color:yellow">Desconectado</span></p>
+    
+    <div id="log-container">
+        </div>
+
+    <script>
+        const ws = new WebSocket('ws://localhost:8080');
+        const logContainer = document.getElementById('log-container');
+
+        ws.onopen = () => {
+            document.getElementById('status').innerText = "ONLINE - Monitorando Threads";
+            document.getElementById('status').style.color = "#0f0";
+            ws.send(JSON.stringify({ type: 'register_dash' }));
+        };
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            
+            if (data.type === 'log') {
+                const entry = document.createElement('div');
+                entry.className = 'log-entry';
+                
+                // Exibe visualmente o processo de criptografia
+                entry.innerHTML = `
+                    <div class="meta">Usuário: ${data.user} | Thread ID: ${Math.floor(Math.random() * 10000)}</div>
+                    <div>🔒 Pacote TCP Recebido (Cifrado): <span class="encrypted">${btoa(data.encrypted)}</span></div>
+                    <div>🔓 Processado na Thread (Decifrado): <span class="decrypted">${data.decrypted}</span></div>
+                `;
+                logContainer.appendChild(entry);
+                logContainer.scrollTop = logContainer.scrollHeight;
+            }
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Chat Seguro Socket</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #121212; color: #e0e0e0; display: flex; justify-content: center; height: 100vh; margin: 0; }
+        .container { width: 400px; background: #1e1e1e; display: flex; flex-direction: column; box-shadow: 0 0 20px rgba(0,0,0,0.5); border-radius: 10px; overflow: hidden; }
+        header { background: #007acc; padding: 15px; text-align: center; font-weight: bold; }
+        #chat-box { flex: 1; padding: 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+        .input-area { padding: 15px; background: #252526; display: flex; gap: 10px; }
+        input { flex: 1; padding: 10px; border-radius: 20px; border: 1px solid #333; background: #333; color: white; outline: none; }
+        button { padding: 10px 20px; border-radius: 20px; border: none; background: #007acc; color: white; cursor: pointer; font-weight: bold; }
+        button:hover { background: #005f9e; }
+        
+        .msg { padding: 8px 12px; border-radius: 15px; max-width: 80%; font-size: 0.9em; word-wrap: break-word; }
+        .msg.me { align-self: flex-end; background: #005f9e; color: white; }
+        .msg.other { align-self: flex-start; background: #333; color: #ddd; }
+        .msg.sys { align-self: center; background: transparent; color: #666; font-size: 0.8em; }
+        .debug-info { font-size: 0.7em; color: #aaa; margin-top: 4px; display: block; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>Chat Criptografado (Threaded)</header>
+        <div id="chat-box"></div>
+        <div class="input-area">
+            <input type="text" id="username" placeholder="Seu Nome" style="width: 25%;">
+            <input type="text" id="message" placeholder="Digite sua mensagem...">
+            <button onclick="sendMessage()">Enviar</button>
+        </div>
+    </div>
+
+    <script>
+        const ws = new WebSocket('ws://localhost:8080');
+        const chatBox = document.getElementById('chat-box');
+        const XOR_KEY = "SEGREDOSUPERSECRETO"; // Mesma chave do servidor
+
+        // Algoritmo de Criptografia XOR (Simples mas eficaz para demonstrar)
+        function xorCipher(text) {
+            let result = "";
+            for (let i = 0; i < text.length; i++) {
+                result += String.fromCharCode(text.charCodeAt(i) ^ XOR_KEY.charCodeAt(i % XOR_KEY.length));
+            }
+            return result;
+        }
+
+        ws.onopen = () => {
+            console.log("Conectado ao servidor.");
+            addMessage("Sistema", "Conectado com sucesso.", "sys");
+            ws.send(JSON.stringify({ type: 'register_chat' }));
+        };
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            
+            if (data.type === 'message') {
+                // Descriptografar mensagem recebida
+                const decrypted = xorCipher(data.payload);
+                const isMe = data.user === document.getElementById('username').value;
+                addMessage(data.user, decrypted, isMe ? "me" : "other", data.payload);
+            } else if (data.text) {
+                addMessage("Sistema", data.text, "sys");
+            }
+        };
+
+        function sendMessage() {
+            const input = document.getElementById('message');
+            const user = document.getElementById('username').value || "Anônimo";
+            const text = input.value;
+            
+            if (text.trim() === "") return;
+
+            // Criptografar ANTES de enviar
+            const encrypted = xorCipher(text);
+
+            const payload = {
+                type: 'message',
+                user: user,
+                payload: encrypted // Envia apenas o lixo criptografado
+            };
+
+            ws.send(JSON.stringify(payload));
+            input.value = "";
+        }
+
+        function addMessage(user, text, type, rawCipher = null) {
+            const div = document.createElement('div');
+            div.className = `msg ${type}`;
+            
+            let content = `<strong>${user}</strong>: ${text}`;
+            if (rawCipher && type !== 'sys') {
+                // Mostrar o dado criptografado para "impressionar" (opcional)
+                content += `<span class='debug-info'>[Wireshark vê: ${btoa(rawCipher).substring(0,10)}...]</span>`;
+            }
+            
+            div.innerHTML = content;
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+    </script>
+</body>
+</html>
