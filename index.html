@@ -5,7 +5,7 @@
     <title>Chat Seguro Socket</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background-color: #121212; color: #e0e0e0; display: flex; justify-content: center; height: 100vh; margin: 0; }
-        .container { width: 400px; background: #1e1e1e; display: flex; flex-direction: column; box-shadow: 0 0 20px rgba(0,0,0,0.5); border-radius: 10px; overflow: hidden; }
+        .container { width: 100%; background: #1e1e1e; display: flex; flex-direction: column; box-shadow: 0 0 20px rgba(0,0,0,0.5); border-radius: 10px; overflow: hidden; }
         header { background: #007acc; padding: 15px; text-align: center; font-weight: bold; }
         #chat-box { flex: 1; padding: 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
         .input-area { padding: 15px; background: #252526; display: flex; gap: 10px; }
@@ -34,9 +34,7 @@
     <script>
         const ws = new WebSocket('ws://localhost:8080');
         const chatBox = document.getElementById('chat-box');
-        const XOR_KEY = "SEGREDOSUPERSECRETO"; // Mesma chave do servidor
-
-        // Algoritmo de Criptografia XOR (Simples mas eficaz para demonstrar)
+        const XOR_KEY = "SEGREDOSUPERSECRETO"; 
         function xorCipher(text) {
             let result = "";
             for (let i = 0; i < text.length; i++) {
@@ -53,9 +51,8 @@
 
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
-            
+            console.log("Mensagem recebida:", data);
             if (data.type === 'message') {
-                // Descriptografar mensagem recebida
                 const decrypted = xorCipher(data.payload);
                 const isMe = data.user === document.getElementById('username').value;
                 addMessage(data.user, decrypted, isMe ? "me" : "other", data.payload);
@@ -71,16 +68,16 @@
             
             if (text.trim() === "") return;
 
-            // Criptografar ANTES de enviar
             const encrypted = xorCipher(text);
 
             const payload = {
                 type: 'message',
                 user: user,
-                payload: encrypted // Envia apenas o lixo criptografado
+                payload: encrypted 
             };
 
             ws.send(JSON.stringify(payload));
+            console.log("Mensagem enviada:", payload);
             input.value = "";
         }
 
@@ -89,10 +86,7 @@
             div.className = `msg ${type}`;
             
             let content = `<strong>${user}</strong>: ${text}`;
-            if (rawCipher && type !== 'sys') {
-                // Mostrar o dado criptografado para "impressionar" (opcional)
-                content += `<span class='debug-info'>[Wireshark vê: ${btoa(rawCipher).substring(0,10)}...]</span>`;
-            }
+            
             
             div.innerHTML = content;
             chatBox.appendChild(div);
