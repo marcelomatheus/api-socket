@@ -6,17 +6,15 @@ import struct
 import json
 import time
 
-# --- CONFIGURAÇÕES ---
 HOST = '127.0.0.1'
 PORT = 8080
-MAGIC_STRING = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11" # Constante do protocolo WebSocket
-XOR_KEY = "SEGREDOSUPERSECRETO" # Chave para criptografia simétrica
+MAGIC_STRING = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11" 
+XOR_KEY = "SEGREDOSUPERSECRETO" 
 
-clients = [] # Lista de clientes conectados (Chat)
-dashboards = [] # Lista de admins conectados (Monitoramento)
+clients = [] 
+dashboards = [] 
 
 def xor_cipher(text, key):
-    """Criptografia XOR simples para visualização no Wireshark"""
     encrypted = []
     for i, char in enumerate(text):
         key_char = key[i % len(key)]
@@ -24,7 +22,6 @@ def xor_cipher(text, key):
     return "".join(encrypted)
 
 def create_handshake_response(headers):
-    """Gera a resposta HTTP 101 para upgrade de protocolo"""
     key = headers['Sec-WebSocket-Key']
     accept_key = base64.b64encode(hashlib.sha1((key + MAGIC_STRING).encode()).digest()).decode()
     return (
@@ -35,10 +32,8 @@ def create_handshake_response(headers):
     ).encode()
 
 def parse_frame(data):
-    """Decodifica o frame binário do WebSocket (RFC 6455)"""
     if len(data) < 2: return None
     
-    # Byte 1: Máscara e Tamanho
     second_byte = data[1]
     is_masked = second_byte & 128
     payload_len = second_byte & 127
@@ -60,11 +55,9 @@ def parse_frame(data):
     return decoded.decode('utf-8')
 
 def create_frame(message):
-    """Cria um frame WebSocket para enviar ao navegador (sem máscara)"""
     msg_bytes = message.encode('utf-8')
     length = len(msg_bytes)
     
-    # Byte 0: Fin=1, Opcode=1 (Texto) -> 10000001 -> 129
     frame = bytearray([129])
     
     if length <= 125:
@@ -80,24 +73,17 @@ def create_frame(message):
     return frame
 
 def broadcast(message, is_system_msg=False):
-    """Envia mensagem para todos os clientes conectados"""
-    # Se for mensagem de sistema, não precisa cifrar com XOR do chat, apenas envia JSON puro
     msg_to_send = message
     
-    print(f"[LOG] Enviando broadcast: {msg_to_send[:50]}...")
     frame = create_frame(msg_to_send)
     
-    # Enviar para Dashboards (texto puro)
     for dash in dashboards:
         try:
             dash.send(frame)
         except:
             dashboards.remove(dash)
 
-    # Enviar para Clientes (Chat)
-    # Se não for mensagem de sistema, clientes esperam receber cifrado!
     if not is_system_msg:
-         # O payload JSON deve estar cifrado
          pass 
 
     for client in clients:
@@ -107,10 +93,8 @@ def broadcast(message, is_system_msg=False):
             clients.remove(client)
 
 def handle_client(conn, addr):
-    """Função executada por cada THREAD"""
     print(f"[NOVA CONEXÃO] {addr} conectado.")
     
-    # 1. Handshake
     data = conn.recv(1024).decode()
     headers = {}
     for line in data.split("\r\n")[1:]:
@@ -122,51 +106,34 @@ def handle_client(conn, addr):
         print("Não é um request WebSocket.")
         conn.close()
         return
-
     conn.send(create_handshake_response(headers))
-    
-    # Identificar se é Dashboard ou Chat
-    # (Simplificação: Dashboard envia um JSON específico logo após conectar)
-    client_type = "chat" 
-    
     try:
         while True:
             data = conn.recv(2048)
             if not data: break
             
-            # Decodificar o frame do WebSocket
             text_received = parse_frame(data)
             
             if not text_received: continue
 
-            # Lógica para registrar tipos de clientes
             try:
                 msg_json = json.loads(text_received)
                 if msg_json.get('type') == 'register_dash':
                     dashboards.append(conn)
-                    client_type = "dash"
                     print(f"Dashboard registrado: {addr}")
                     continue
                 
                 if msg_json.get('type') == 'register_chat':
                     if conn not in clients: clients.append(conn)
-                    msg_json['text'] = f"Entrou na sala." # Mensagem de sistema
+                    msg_json['text'] = f"Entrou na sala."
                     broadcast(json.dumps(msg_json))
                     continue
 
-                # MENSAGEM DE CHAT (CRIPTOGRAFADA)
                 if msg_json.get('type') == 'message':
                     encrypted_text = msg_json.get('payload')
                     
-                    # 1. Descriptografar no servidor (simulando processamento seguro)
                     decrypted_text = xor_cipher(encrypted_text, XOR_KEY)
                     
-                    print(f"\n--- CRIPTOGRAFIA ---")
-                    print(f"Recebido (Cifrado): {encrypted_text}")
-                    print(f"Decifrado (Servidor): {decrypted_text}")
-                    print(f"--------------------\n")
-                    
-                    # Enviar para o Dashboard ver o log
                     log_msg = json.dumps({
                         "type": "log", 
                         "encrypted": encrypted_text, 
@@ -175,9 +142,6 @@ def handle_client(conn, addr):
                     })
                     for dash in dashboards: dash.send(create_frame(log_msg))
 
-                    # 2. Reenviar para todos (Broadcast)
-                    # No mundo real, re-criptografaríamos com a chave de cada cliente.
-                    # Aqui, reenviamos o payload original para validar o conceito.
                     broadcast(json.dumps(msg_json))
 
             except json.JSONDecodeError:
@@ -191,7 +155,6 @@ def handle_client(conn, addr):
         conn.close()
         print(f"[DESCONECTADO] {addr}")
 
-# --- INICIALIZAÇÃO ---
 def start_server():
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind((HOST, PORT))
@@ -201,7 +164,6 @@ def start_server():
 
     while True:
         conn, addr = server.accept()
-        # CRIAÇÃO DA THREAD (Requisito fundamental)
         thread = threading.Thread(target=handle_client, args=(conn, addr))
         thread.start()
         print(f"[THREADS ATIVAS] {threading.active_count() - 1}")
