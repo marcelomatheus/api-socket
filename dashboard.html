@@ -37,11 +37,10 @@
                 const entry = document.createElement('div');
                 entry.className = 'log-entry';
                 
-                // Exibe visualmente o processo de criptografia
                 entry.innerHTML = `
                     <div class="meta">Usuário: ${data.user} | Thread ID: ${Math.floor(Math.random() * 10000)}</div>
-                    <div>🔒 Pacote TCP Recebido (Cifrado): <span class="encrypted">${btoa(data.encrypted)}</span></div>
-                    <div>🔓 Processado na Thread (Decifrado): <span class="decrypted">${data.decrypted}</span></div>
+                    <div>Pacote TCP Recebido (Cifrado): <span class="encrypted">${btoa(data.encrypted)}</span></div>
+                    <div>Processado na Thread (Decifrado): <span class="decrypted">${data.decrypted}</span></div>
                 `;
                 logContainer.appendChild(entry);
                 logContainer.scrollTop = logContainer.scrollHeight;
